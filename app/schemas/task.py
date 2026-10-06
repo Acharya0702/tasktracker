@@ -1,6 +1,6 @@
 from datetime import date
 from enum import StrEnum
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class Status(StrEnum):
@@ -16,5 +16,7 @@ class TaskCreate(BaseModel):
 
 
 class TaskRead(TaskCreate):
+    model_config = ConfigDict(from_attributes=True)
+
     id: int
     status: Status
