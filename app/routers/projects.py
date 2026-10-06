@@ -1,14 +1,14 @@
 from typing import Annotated
-from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy.orm import Session
 
-from app.db import get_db
+from fastapi import APIRouter, Depends, status
+
+from app.deps import CurrentUser
 from app.schemas.project import ProjectCreate, ProjectRead, ProjectUpdate
 from app.services.project_service import ProjectService
 
-router = APIRouter(prefix="/projects", tags=["projects"])
+from app.deps import DB
 
-DB = Annotated[Session, Depends(get_db)]
+router = APIRouter(prefix="/projects", tags=["projects"])
 
 
 def get_service(db: DB) -> ProjectService:
@@ -19,34 +19,32 @@ Service = Annotated[ProjectService, Depends(get_service)]
 
 
 @router.get("", response_model=list[ProjectRead])
-def list_projects(service: Service):
-    # TODO: Day 10 ରେ current_user ଆସିବ
-    return service.list_for_owner(owner_id=1)
+def list_projects(user: CurrentUser, service: Service):
+    return service.list_for_owner(user.id)
 
 
-@router.post("", response_model=ProjectRead, status_code=201)
-def create_project(body: ProjectCreate, service: Service):
-    # TODO: Day 10 ରେ current_user ଆସିବ
-    return service.create(body, owner_id=1)
+@router.post("", response_model=ProjectRead, status_code=status.HTTP_201_CREATED)
+def create_project(
+    body: ProjectCreate, user: CurrentUser, service: Service
+):
+    return service.create(body, user.id)
 
 
 @router.get("/{project_id}", response_model=ProjectRead)
-def get_project(project_id: int, service: Service):
-    project = service.get(project_id)
-    if project is None:
-        raise HTTPException(404, "Project not found")
-    return project
+def get_project(project_id: int, user: CurrentUser, service: Service):
+    return service.get_owned(project_id, user.id)
 
 
 @router.patch("/{project_id}", response_model=ProjectRead)
-def update_project(project_id: int, body: ProjectUpdate, service: Service):
-    project = service.update(project_id, body)
-    if project is None:
-        raise HTTPException(404, "Project not found")
-    return project
+def update_project(
+    project_id: int,
+    body: ProjectUpdate,
+    user: CurrentUser,
+    service: Service,
+):
+    return service.update(project_id, user.id, body)
 
 
-@router.delete("/{project_id}", status_code=204)
-def delete_project(project_id: int, service: Service):
-    if not service.delete(project_id):
-        raise HTTPException(404, "Project not found")
+@router.delete("/{project_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_project(project_id: int, user: CurrentUser, service: Service):
+    service.delete(project_id, user.id)
